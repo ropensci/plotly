@@ -222,14 +222,8 @@ to_basic.GeomStep <- function(data, prestats_data, layout, params, p, ...) {
 
 #' @export
 to_basic.GeomSegment <- function(data, prestats_data, layout, params, p, ...) {
-  # Every row is one segment, we convert to a line with several
-  # groups which can be efficiently drawn by adding NA rows.
-  data$group <- seq_len(nrow(data))
-  others <- data[!names(data) %in% c("x", "y", "xend", "yend")]
-  data <- with(data, {
-    rbind(cbind(x, y, others),
-          cbind(x = xend, y = yend, others))
-  })
+  # Convert segment data
+  data <- segment2path(data)
   prefix_class(data, "GeomPath")
 }
 
@@ -590,8 +584,8 @@ to_basic.GeomDumbbell <- function(data, prestats_data, layout, params, p, ...) {
   # Setup data for left points
   points_x <- data
   points_x <- make_hovertext_aes(points_x, params, c("x", "y"))
-  points_x$colour <- params$colour_x %||% data$colour
   points_x$xend <- NULL
+  points_x$colour <- params$colour_x %||% data$colour
   points_x$size <- params$size_x %||% (data$size * 1.2)
   # Setup data for right points
   points_xend <- data
@@ -602,35 +596,28 @@ to_basic.GeomDumbbell <- function(data, prestats_data, layout, params, p, ...) {
   points_xend$size <- params$size_xend %||% (data$size * 1.25)
   # Setup data for dot_guide
   dot_df <- data
-  dot_df <- merge(dot_df, layout$layout, by = "PANEL", sort = FALSE)
   dot_df$hovertext <- NULL
+  # Merge panel to set x = x_min
+  dot_df <- merge(dot_df, layout$layout, by = "PANEL", sort = FALSE)
   dot_df$xend <- ifelse(data$xend < data$x, data$xend, data$x)
   dot_df$x <- dot_df[["x_min"]]
   dot_df$linetype <- "dotted"
   dot_df$size <- params$dot_guide_size %||% (data$size * 0.5)
   dot_df$colour <- params$dot_guide_colour %||% "#5b5b5b"
-  # Copy from to_basic.GeomSegment
-  dot_df$group <- seq_len(nrow(dot_df))
-  others <- dot_df[!names(dot_df) %in% c("x", "y", "xend", "yend")]
-  dot_df <- with(dot_df, {
-    rbind(cbind(x, y, others),
-          cbind(x = xend, y = yend, others))
-  })
   # Setup data for connecting segment
   data$hovertext <- NULL
-  # Copy from to_basic.GeomSegment 
-  data$group <- seq_len(nrow(data))
-  others <- data[!names(data) %in% c("x", "y", "xend", "yend")]
-  data <- with(data, {
-    rbind(cbind(x, y, others),
-          cbind(x = xend, y = yend, others))
-  })
+  # Convert segment data
+  dot_df <- segment2path(dot_df)
+  data <- segment2path(data)
+
   # Set classes
-  list(
-    if (isTRUE(params$dot_guide)) prefix_class(dot_df, "GeomPath"),
-    prefix_class(data, "GeomPath"),
-    prefix_class(points_x, "GeomPoint"),
-    prefix_class(points_xend, "GeomPoint")
+  c(
+    if (isTRUE(params$dot_guide)) list(prefix_class(dot_df, "GeomPath")),
+    list(
+      prefix_class(data, "GeomPath"),
+      prefix_class(points_x, "GeomPoint"),
+      prefix_class(points_xend, "GeomPoint")
+    )
   )
 }
 
@@ -1196,3 +1183,15 @@ make_hovertext <- function(data, hoverTextAes) {
     x
   }, data, hoverTextAes)  
 }
+
+# Convert segment data to be drawn as GeomPath
+segment2path <- function(data) {
+  # Every row is one segment, we convert to a line with several
+  # groups which can be efficiently drawn by adding NA rows.
+  data$group <- seq_len(nrow(data))
+  others <- data[!names(data) %in% c("x", "y", "xend", "yend")]
+  data <- with(data, {
+    rbind(cbind(x, y, others),
+          cbind(x = xend, y = yend, others))
+  })  
+} 
