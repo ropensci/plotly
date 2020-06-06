@@ -162,9 +162,39 @@ config <- function(p, ..., cloud = FALSE, showSendToCloud = cloud, locale = NULL
   
   args <- list(...)
   if ("collaborate" %in% names(args)) warning("The collaborate button is no longer supported")
+  if ("modeBarButtonsToKeep" %in% names(args)) args <- modebar_keep(args)
   p$x$config <- modify_list(p$x$config, args)
   if (cloud) warning("The `cloud` argument is deprecated. Use `showSendToCloud` instead.")
   p$x$config$showSendToCloud <- showSendToCloud
 
   p
+}
+
+# Add all mode bar names to modeBarButtonsToRemove except the 
+# ones given by modeBarButtonsToKeep
+modebar_keep <- function(args) {
+  
+  modebar_names <- modebar_names()
+  x <- setdiff(modebar_names, unlist(args[["modeBarButtonsToKeep"]]))
+  args[["modeBarButtonsToRemove"]] <- as.list(x)
+  # Remove modeBarButtonsToKeep from args to prevent warning
+  args[["modeBarButtonsToKeep"]] <- NULL
+  args
+}
+
+# List of mode bar names from
+# https://github.com/plotly/plotly.js/blob/master/src/components/modebar/buttons.js
+modebar_names <- function() {
+  c(
+    "toImage", "sendDataToCloud", "editInChartStudio", "zoom2d",
+    "pan2d", "select2d", "lasso2d", "drawclosedpath", "drawopenpath",
+    "drawline", "drawrect", "drawcircle", "eraseshape", "zoomIn2d",
+    "zoomOut2d", "autoScale2d", "resetScale2d", "hoverClosestCartesian",
+    "hoverCompareCartesian", "zoom3d", "pan3d", "orbitRotation",
+    "tableRotation", "resetCameraDefault3d", "resetCameraLastSave3d",
+    "hoverClosest3d", "zoomInGeo", "zoomOutGeo", "resetGeo", "hoverClosestGeo",
+    "hoverClosestGl2d", "hoverClosestPie", "resetViewSankey", "toggleHover",
+    "resetViews", "toggleSpikelines", "resetViewMapbox", "zoomInMapbox",
+    "zoomOutMapbox"
+  )
 }
