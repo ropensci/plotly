@@ -19,9 +19,8 @@ test_that("geom_dumbbell is rendered", {
   
   L <- plotly_build(g)
 
-  # visual testing fails ):
-  # while running vdiffr::manage_cases shows a successful doppelganger 
-  #expect_doppelganger(L, "dumbbell")
+  # Test
+  expect_doppelganger(L, "dumbbell")
 
   # Check for four layers
   expect_equivalent(length(L$x$data), 4)
@@ -53,9 +52,8 @@ test_that("geom_dumbbell without dot guide is rendered", {
   
   L <- plotly_build(g)
   
-  # visual testing fails ):
-  # while running vdiffr::manage_cases shows a successful doppelganger 
-  #expect_doppelganger(L, "dumbbell-no-guide")
+  # Test
+  expect_doppelganger(L, "dumbbell-no-guide")
   
   # Check for three layers
   expect_equivalent(length(L$x$data), 3)
