@@ -70,7 +70,8 @@ Suggests:
     IRdisplay,
     processx,
     plotlyGeoAssets,
-    forcats
+    forcats,
+    ggalt
 LazyData: true
 RoxygenNote: 7.1.0
 Encoding: UTF-8

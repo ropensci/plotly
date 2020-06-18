@@ -44,32 +44,7 @@ layers2traces <- function(data, prestats_data, layout, p) {
   hoverTextAes <- lapply(params, "[[", "hoverTextAes")
   # attach a new column (hovertext) to each layer of data
   # (mapped to the text trace property)
-  data <- Map(function(x, y) {
-    if (nrow(x) == 0) return(x)
-    # make sure the relevant aes exists in the data
-    for (i in seq_along(y)) {
-      aesName <- names(y)[[i]]
-      if (!aesName %in% names(x)) next
-      # TODO: should we be getting the name from scale_*(name) first?
-      varName <- y[[i]]
-      # "automatically" generated group aes is not informative
-      if (identical("group", unique(varName, aesName))) next
-      # add a line break if hovertext already exists
-      if ("hovertext" %in% names(x)) x$hovertext <- paste0(x$hovertext, br())
-      # text aestheic should be taken verbatim (for custom tooltips)
-      prefix <- if (identical(aesName, "text")) "" else paste0(varName, ": ")
-      # look for the domain, if that's not found, provide the range (useful for identity scales)
-      txt <- x[[paste0(aesName, "_plotlyDomain")]] %||% x[[aesName]]
-      suffix <- tryNULL(format(txt, justify = "none")) %||% ""
-      # put the height of the bar in the tooltip
-      if (inherits(x, "GeomBar") && identical(aesName, "y")) {
-        suffix <- format(x[["ymax"]] - x[["ymin"]], justify = "none")
-      }
-      x$hovertext <- paste0(x$hovertext, prefix, suffix)
-    }
-    x$hovertext <- x$hovertext %||% ""
-    x
-  }, data, hoverTextAes)
+  data <- make_hovertext(data, hoverTextAes)
   
   # draw legends only for discrete scales
   discreteScales <- list()
@@ -247,14 +222,8 @@ to_basic.GeomStep <- function(data, prestats_data, layout, params, p, ...) {
 
 #' @export
 to_basic.GeomSegment <- function(data, prestats_data, layout, params, p, ...) {
-  # Every row is one segment, we convert to a line with several
-  # groups which can be efficiently drawn by adding NA rows.
-  data$group <- seq_len(nrow(data))
-  others <- data[!names(data) %in% c("x", "y", "xend", "yend")]
-  data <- with(data, {
-    rbind(cbind(x, y, others),
-          cbind(x = xend, y = yend, others))
-  })
+  # Convert segment data
+  data <- segment2path(data)
   prefix_class(data, "GeomPath")
 }
 
@@ -606,6 +575,50 @@ to_basic.GeomQuantile <- function(data, prestats_data, layout, params, p, ...){
   dat <- split(data, data$quantile)
   dat <- lapply(dat, prefix_class, y = "GeomPath")
   dat
+}
+
+#' @export
+to_basic.GeomDumbbell <- function(data, prestats_data, layout, params, p, ...) {
+  # Adds support for ggalt::geom_dumbbell
+  # Implementation follows ggalt::GeomDumbbell
+  # Setup data for left points
+  points_x <- data
+  points_x <- make_hovertext_aes(points_x, params, c("x", "y"))
+  points_x$xend <- NULL
+  points_x$colour <- params$colour_x %||% data$colour
+  points_x$size <- params$size_x %||% (data$size * 1.2)
+  # Setup data for right points
+  points_xend <- data
+  points_xend <- make_hovertext_aes(points_xend, params, c("xend", "y"))
+  points_xend$x <- points_xend$xend
+  points_xend$xend <- NULL
+  points_xend$colour <- params$colour_xend %||% data$colour
+  points_xend$size <- params$size_xend %||% (data$size * 1.25)
+  # Setup data for dot_guide
+  dot_df <- data
+  dot_df$hovertext <- NULL
+  # Merge panel to set x = x_min
+  dot_df <- merge(dot_df, layout$layout, by = "PANEL", sort = FALSE)
+  dot_df$xend <- ifelse(data$xend < data$x, data$xend, data$x)
+  dot_df$x <- dot_df[["x_min"]]
+  dot_df$linetype <- "dotted"
+  dot_df$size <- params$dot_guide_size %||% (data$size * 0.5)
+  dot_df$colour <- params$dot_guide_colour %||% "#5b5b5b"
+  # Setup data for connecting segment
+  data$hovertext <- NULL
+  # Convert segment data
+  dot_df <- segment2path(dot_df)
+  data <- segment2path(data)
+
+  # Set classes
+  c(
+    if (isTRUE(params$dot_guide)) list(prefix_class(dot_df, "GeomPath")),
+    list(
+      prefix_class(data, "GeomPath"),
+      prefix_class(points_x, "GeomPoint"),
+      prefix_class(points_xend, "GeomPoint")
+    )
+  )
 }
 
 #' @export
@@ -1125,3 +1138,60 @@ lty2dash <- function(x) {
   }
   as.character(x)
 }
+
+# attach a new column (hovertext) to each layer of data
+# only aes given in aes_list are included in hovertext
+make_hovertext_aes <- function(data, params, aes_list) {
+  # Clear hovertext
+  data$hovertext <- NULL
+  # Setup list of aes to include in hovertext
+  hoverTextAes <- Reduce(
+    function(l, x) append(l, params$hoverTextAes[[x]]), aes_list,
+    init = list()
+  )
+  hoverTextAes <- setNames(hoverTextAes, aes_list)
+  # Attach new column hovertext to data
+  make_hovertext(list(data), list(hoverTextAes))[[1]]
+}
+
+# attach a new column (hovertext) to each layer of data
+make_hovertext <- function(data, hoverTextAes) {
+  Map(function(x, y) {
+    if (nrow(x) == 0) return(x)
+    # make sure the relevant aes exists in the data
+    for (i in seq_along(y)) {
+      aesName <- names(y)[[i]]
+      if (!aesName %in% names(x)) next
+      # TODO: should we be getting the name from scale_*(name) first?
+      varName <- y[[i]]
+      # "automatically" generated group aes is not informative
+      if (identical("group", unique(varName, aesName))) next
+      # add a line break if hovertext already exists
+      if ("hovertext" %in% names(x)) x$hovertext <- paste0(x$hovertext, br())
+      # text aestheic should be taken verbatim (for custom tooltips)
+      prefix <- if (identical(aesName, "text")) "" else paste0(varName, ": ")
+      # look for the domain, if that's not found, provide the range (useful for identity scales)
+      txt <- x[[paste0(aesName, "_plotlyDomain")]] %||% x[[aesName]]
+      suffix <- tryNULL(format(txt, justify = "none")) %||% ""
+      # put the height of the bar in the tooltip
+      if (inherits(x, "GeomBar") && identical(aesName, "y")) {
+        suffix <- format(x[["ymax"]] - x[["ymin"]], justify = "none")
+      }
+      x$hovertext <- paste0(x$hovertext, prefix, suffix)
+    }
+    x$hovertext <- x$hovertext %||% ""
+    x
+  }, data, hoverTextAes)  
+}
+
+# Convert segment data to be drawn as GeomPath
+segment2path <- function(data) {
+  # Every row is one segment, we convert to a line with several
+  # groups which can be efficiently drawn by adding NA rows.
+  data$group <- seq_len(nrow(data))
+  others <- data[!names(data) %in% c("x", "y", "xend", "yend")]
+  data <- with(data, {
+    rbind(cbind(x, y, others),
+          cbind(x = xend, y = yend, others))
+  })  
+} 
