@@ -131,7 +131,7 @@ rangeslider <- function(p, start = NULL, end = NULL, ...) {
 #' config(p, locale = "zh-CN")
 #' 
 
-config <- function(p, ..., cloud = FALSE, showSendToCloud = cloud, locale = NULL, mathjax = NULL) {
+config <- function(p, ..., modeBarButtonsToKeep = NULL, cloud = FALSE, showSendToCloud = cloud, locale = NULL, mathjax = NULL) {
   
   if (!is.null(locale)) {
     p$x$config$locale <- locale
@@ -162,7 +162,7 @@ config <- function(p, ..., cloud = FALSE, showSendToCloud = cloud, locale = NULL
   
   args <- list(...)
   if ("collaborate" %in% names(args)) warning("The collaborate button is no longer supported")
-  if ("modeBarButtonsToKeep" %in% names(args)) args <- modebar_keep(args)
+  if (!is.null(modeBarButtonsToKeep)) args <- modebar_keep(args, modeBarButtonsToKeep)
   p$x$config <- modify_list(p$x$config, args)
   if (cloud) warning("The `cloud` argument is deprecated. Use `showSendToCloud` instead.")
   p$x$config$showSendToCloud <- showSendToCloud
@@ -172,13 +172,10 @@ config <- function(p, ..., cloud = FALSE, showSendToCloud = cloud, locale = NULL
 
 # Add all mode bar names to modeBarButtonsToRemove except the 
 # ones given by modeBarButtonsToKeep
-modebar_keep <- function(args) {
-  
+modebar_keep <- function(args, modeBarButtonsToKeep) {
   modebar_names <- modebar_names()
-  x <- setdiff(modebar_names, unlist(args[["modeBarButtonsToKeep"]]))
+  x <- setdiff(modebar_names, modeBarButtonsToKeep)
   args[["modeBarButtonsToRemove"]] <- as.list(x)
-  # Remove modeBarButtonsToKeep from args to prevent warning
-  args[["modeBarButtonsToKeep"]] <- NULL
   args
 }
 
