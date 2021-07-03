@@ -65,7 +65,6 @@ Suggests:
     webshot,
     listviewer,
     dendextend,
-    sf,
     maptools,
     rgeos,
     png,
@@ -74,7 +73,8 @@ Suggests:
     plotlyGeoAssets,
     forcats,
     palmerpenguins,
-    rversions
+    rversions,
+    reticulate
 LazyData: true
 RoxygenNote: 7.1.1
 Encoding: UTF-8
